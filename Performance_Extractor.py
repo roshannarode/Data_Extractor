@@ -4,6 +4,7 @@ from toga.style.pack import COLUMN, ROW
 import os
 import pandas as pd
 import re
+from tabulate import tabulate  # NEW: For pretty summary table
 
 # === Global ===
 summary_df_global = None
@@ -13,7 +14,6 @@ operation_name_map = {
     "CreateExchangeElementForPrimitive": "Primitives"
 }
 target_operations = list(operation_name_map.keys())
-total_time_operation = "TotalTimeToCreateExchange"
 
 def extract_model_name(file_name):
     match = re.match(r"metrics_(.*?)_Demo.*\.csv", file_name)
@@ -30,7 +30,6 @@ class CSVSummaryApp(toga.App):
     def startup(self):
         main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
-        # === Folder Input ===
         folder_row = toga.Box(style=Pack(direction=ROW, padding=5))
         self.folder_input = toga.TextInput(readonly=True, style=Pack(flex=1))
         browse_btn = toga.Button("📁 Browse", on_press=self.browse_folder, style=Pack(padding_left=5))
@@ -39,26 +38,21 @@ class CSVSummaryApp(toga.App):
         folder_row.add(browse_btn)
         main_box.add(folder_row)
 
-        # === Connector Dropdown ===
         connector_row = toga.Box(style=Pack(direction=ROW, padding=5))
         self.connector_choice = toga.Selection(items=["Tekla", "Rhino"], style=Pack(width=200))
         connector_row.add(toga.Label("Connector:", style=Pack(width=120)))
         connector_row.add(self.connector_choice)
         main_box.add(connector_row)
 
-        # === Run Button ===
         run_btn = toga.Button("▶ Run Summary", on_press=self.run_processing, style=Pack(padding=10))
         main_box.add(run_btn)
 
-        # === Output Console ===
         self.console_output = toga.MultilineTextInput(readonly=True, style=Pack(height=300, padding=5))
         main_box.add(self.console_output)
 
-        # === Save Button ===
         self.save_btn = toga.Button("💾 Save CSV", on_press=self.save_csv, enabled=False, style=Pack(padding=5))
         main_box.add(self.save_btn)
 
-        # === Status Label ===
         self.status_label = toga.Label("", style=Pack(padding_top=10, color="green"))
         main_box.add(self.status_label)
 
@@ -96,54 +90,128 @@ class CSVSummaryApp(toga.App):
         self.status_label.text = "Processing..."
         model_data = []
 
-        csv_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
-                     if f.endswith('.csv') and os.path.isfile(os.path.join(folder_path, f))]
+        all_csvs = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
+                    if f.endswith('.csv') and os.path.isfile(os.path.join(folder_path, f))]
 
-        if not csv_files:
+        create_folder = os.path.join(folder_path, "Create Exchange Data")
+        read_folder = os.path.join(folder_path, "Read Exchange Data")
+
+        if os.path.isdir(create_folder):
+            all_csvs += [os.path.join(create_folder, f) for f in os.listdir(create_folder)
+                         if f.endswith('.csv') and os.path.isfile(os.path.join(create_folder, f))]
+
+        if os.path.isdir(read_folder):
+            all_csvs += [os.path.join(read_folder, f) for f in os.listdir(read_folder)
+                         if f.endswith('.csv') and os.path.isfile(os.path.join(read_folder, f))]
+
+        if not all_csvs:
             self.log("❌ No CSV files found.")
-            self.status_label.text = "⚠️ No CSV files"
+            self.status_label.text = "⚠️ No CSVs found"
             return
 
-        for csv_file in csv_files:
+        create_csvs = []
+        read_csvs = []
+
+        for csv_file in all_csvs:
             try:
-                self.log(f"📄 Processing: {os.path.basename(csv_file)}")
                 df = pd.read_csv(csv_file)
-                model_name = extract_model_name(os.path.basename(csv_file))
+                if "Operation Name" not in df.columns:
+                    continue
+                if "TotalTimeToCreateExchange" in df["Operation Name"].values:
+                    create_csvs.append(csv_file)
+                elif "TotalTimeToLoadExchange" in df["Operation Name"].values:
+                    read_csvs.append(csv_file)
+            except Exception as e:
+                self.log(f"❌ Could not inspect {os.path.basename(csv_file)}: {e}")
+
+        if not create_csvs and not read_csvs:
+            self.log("❌ No recognizable Tekla CSVs found.")
+            self.status_label.text = "⚠️ No valid Tekla data"
+            return
+
+        model_name_to_summary = {}
+
+        for create_file in create_csvs:
+            try:
+                model_name = extract_model_name(os.path.basename(create_file))
+                self.log(f"📄 Processing Create CSV: {os.path.basename(create_file)}")
+
+                df = pd.read_csv(create_file)
                 df['Matched Operation'] = df['Operation Name'].apply(match_operation)
                 matched_df = df[df['Matched Operation'].notnull()]
 
-                summary = {"Data/Model": model_name, "Mesh": 0, "IFC": 0, "Primitives": 0, "milliseconds": 0}
+                summary = model_name_to_summary.get(model_name, {
+                    "Data/Model": model_name,
+                    "Mesh": 0, "IFC": 0, "Primitives": 0,
+                    "CreateTime(ms)": 0,
+                    "LoadTime(ms)": 0
+                })
 
                 if not matched_df.empty:
                     op_summary = matched_df.groupby('Matched Operation')['#Events'].sum().to_dict()
                     for op_key, count in op_summary.items():
                         display_name = operation_name_map.get(op_key)
                         if display_name:
-                            summary[display_name] = count
+                            summary[display_name] += count
 
-                total_time_row = df[df['Operation Name'] == total_time_operation]
-                if not total_time_row.empty:
-                    summary["milliseconds"] = int(total_time_row["Operation Time in Milliseconds"].sum())
+                total_create = df[df['Operation Name'] == "TotalTimeToCreateExchange"]
+                if not total_create.empty:
+                    summary["CreateTime(ms)"] += int(total_create["Operation Time in Milliseconds"].sum())
 
-                model_data.append(summary)
+                model_name_to_summary[model_name] = summary
 
             except Exception as e:
-                self.log(f"❌ Error processing {csv_file}: {e}")
+                self.log(f"❌ Error processing Create CSV {create_file}: {e}")
 
-        if not model_data:
-            self.log("⚠️ No matching operations found.")
-            self.status_label.text = "⚠️ No relevant data"
+        for read_file in read_csvs:
+            try:
+                model_name = extract_model_name(os.path.basename(read_file))
+                self.log(f"📄 Processing Read CSV: {os.path.basename(read_file)}")
+
+                df = pd.read_csv(read_file)
+                summary = model_name_to_summary.get(model_name, {
+                    "Data/Model": model_name,
+                    "Mesh": 0, "IFC": 0, "Primitives": 0,
+                    "CreateTime(ms)": 0,
+                    "LoadTime(ms)": 0
+                })
+
+                total_read = df[df['Operation Name'] == "TotalTimeToLoadExchange"]
+                if not total_read.empty:
+                    summary["LoadTime(ms)"] += int(total_read["Operation Time in Milliseconds"].sum())
+
+                model_name_to_summary[model_name] = summary
+
+            except Exception as e:
+                self.log(f"❌ Error processing Read CSV {read_file}: {e}")
+
+        if not model_name_to_summary:
+            self.log("⚠️ No summary data collected.")
+            self.status_label.text = "⚠️ Nothing to summarize"
             return
 
-        summary_df = pd.DataFrame(model_data)
-        summary_df["minutes"] = (summary_df["milliseconds"] / 60000).round(2)
+        summary_df = pd.DataFrame(list(model_name_to_summary.values()))
+        summary_df["TotalTime(min)"] = ((summary_df["CreateTime(ms)"] + summary_df["LoadTime(ms)"]) / 60000).round(2)
+
         summary_df = summary_df.fillna(0).astype({
-            "Mesh": int, "IFC": int, "Primitives": int, "milliseconds": int
+            "Mesh": int, "IFC": int, "Primitives": int,
+            "CreateTime(ms)": int, "LoadTime(ms)": int
         })
 
         summary_df_global = summary_df
-        self.log("\n===== Final Summary =====\n")
-        self.log(summary_df.to_string(index=False))
+
+        # 👇 NEW: Beautiful console summary
+        self.log("\n================= FINAL SUMMARY =================")
+        formatted_table = tabulate(
+            summary_df,
+            headers="keys",
+            tablefmt="github",
+            showindex=False,
+            numalign="right",
+            stralign="left"
+        )
+        self.log(formatted_table)
+
         self.status_label.text = "✅ Done. Click 'Save CSV' to export."
         self.save_btn.enabled = True
 
@@ -164,4 +232,3 @@ def main():
 
 if __name__ == "__main__":
     main().main_loop()
-
