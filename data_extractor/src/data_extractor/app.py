@@ -1,12 +1,10 @@
 """
 Project Zero
 """
-
 import toga
-from toga.style import Pack
-from toga.style.pack import COLUMN
-from hi import build_gui
-from tekla_processor import process_tekla_csv_files
+
+from data_extractor.hi import build_gui
+from data_extractor.tekla_processor import process_tekla_csv_files
 import os
 
 summary_df_global = None  # Make sure this is declared at the module level
@@ -72,5 +70,3 @@ class Data_extractor(toga.App):
 
 def main():
     return Data_extractor("Data Extractor", "org.example.dataextractor")
-
-
