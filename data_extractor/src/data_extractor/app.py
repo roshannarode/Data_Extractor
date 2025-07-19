@@ -3,7 +3,7 @@ Project Zero
 """
 import toga
 
-from .hi import build_gui
+from .gui import build_gui
 from .tekla_processor import process_tekla_csv_files
 import os
 
