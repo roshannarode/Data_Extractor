@@ -1,7 +1,12 @@
 import os
 import pandas as pd
 from tabulate import tabulate
-from data_extractor.utils import extract_model_name, match_operation
+
+# Handle both development and packaged import scenarios
+try:
+    from .utils import extract_model_name, match_operation, operation_name_map
+except ImportError:
+    from data_extractor.utils import extract_model_name, match_operation, operation_name_map
 
 def process_tekla_csv_files(folder_path, ui):
     ui['status'].text = "Processing..."

@@ -2,14 +2,14 @@
 [tool.briefcase]
 project_name = "Data_Extractor]"
 bundle = "com.roshannarode"
-version = "0.0.1"
+version = "0.0.4"
 url = "https://roshannarode.com/data_extractor"
 license.file = "LICENSE"
 author = "Roshan Narode"
 author_email = "roshan.narode"
 
 [tool.briefcase.app.data_extractor]
-formal_name = "Data_extractor"
+formal_name = "Data_Extractor"
 description = "Project Zero"
 long_description = """More details about the app should go here.
 """
