@@ -30,7 +30,7 @@ def match_operation(op_name):
     return None
 
 # === Tekla Processing Logic ===
-def process_tekla_csv_files(folder_path, output_console, status_label):
+def process_tekla_csv_files(file_paths, output_console, status_label):
     global summary_df_global
     output_console.insert(tk.END, "⏳ Processing Tekla files...\n\n")
     output_console.update()
@@ -38,13 +38,12 @@ def process_tekla_csv_files(folder_path, output_console, status_label):
     status_label.config(text="Processing...")
     status_label.update()
 
-    csv_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
-                 if f.endswith('.csv') and os.path.isfile(os.path.join(folder_path, f))]
+    csv_files = [f for f in file_paths if f.endswith(".csv") and os.path.isfile(f)]
 
     if not csv_files:
-        output_console.insert(tk.END, "❌ No CSV files found in the selected folder.\n")
+        output_console.insert(tk.END, "❌ No valid CSV files selected.\n")
         output_console.update()
-        status_label.config(text="⚠️ No CSV files found")
+        status_label.config(text="⚠️ No valid CSV files")
         status_label.update()
         return
 
@@ -115,11 +114,13 @@ def save_summary_csv():
         messagebox.showwarning("No Data", "No summary available to save.")
         return
 
-    folder_path = folder_entry.get()
-    if not os.path.isdir(folder_path):
-        messagebox.showerror("Error", "Invalid folder path!")
+    file_paths = resolve_file_paths(folder_entry.get().strip())
+
+    if not file_paths:
+        messagebox.showerror("Error", "Invalid file or folder selection!")
         return
 
+    folder_path = os.path.dirname(file_paths[0])
     output_csv_path = os.path.join(folder_path, "final_model_summary.csv")
     summary_df_global.to_csv(output_csv_path, index=False)
 
@@ -127,27 +128,43 @@ def save_summary_csv():
     output_console.update()
     status_label.config(text="✅ CSV saved")
 
-# === Folder Browse ===
-def browse_folder():
-    folder_selected = filedialog.askdirectory()
-    if folder_selected:
+# === File/Folder Resolution ===
+def resolve_file_paths(entry_value):
+    if os.path.isdir(entry_value):
+        return [os.path.join(entry_value, f) for f in os.listdir(entry_value) if f.endswith(".csv")]
+    elif ";" in entry_value:
+        return [f for f in entry_value.split(";") if os.path.isfile(f)]
+    elif os.path.isfile(entry_value):
+        return [entry_value]
+    return []
+
+# === Browse (Files or Folder) ===
+def browse_files_or_folder():
+    file_selected = filedialog.askopenfilenames(filetypes=[("CSV files", "*.csv")])
+    if file_selected:
         folder_entry.delete(0, tk.END)
-        folder_entry.insert(0, folder_selected)
+        folder_entry.insert(0, ";".join(file_selected))
+    else:
+        folder_selected = filedialog.askdirectory()
+        if folder_selected:
+            folder_entry.delete(0, tk.END)
+            folder_entry.insert(0, folder_selected)
 
 # === Main Run Button ===
 def run_processing():
-    save_button.config(state="disabled")  # Disable save initially
-    folder_path = folder_entry.get()
+    save_button.config(state="disabled")
+    entry_value = folder_entry.get().strip()
     selected_connector = connector_var.get()
+    file_paths = resolve_file_paths(entry_value)
 
-    if not os.path.isdir(folder_path):
-        messagebox.showerror("Error", "Invalid folder path!")
+    if not file_paths:
+        messagebox.showerror("Error", "Please select valid CSV files or a folder containing CSV files!")
         return
 
     output_console.delete(1.0, tk.END)
 
     if selected_connector == "Tekla":
-        process_tekla_csv_files(folder_path, output_console, status_label)
+        process_tekla_csv_files(file_paths, output_console, status_label)
     elif selected_connector == "Rhino":
         process_rhino_placeholder(output_console, status_label)
     else:
@@ -155,7 +172,7 @@ def run_processing():
 
 # === GUI Setup ===
 root = tk.Tk()
-root.title("📊 CSV Model Summary Version 2")
+root.title("Data Extractor Version 2")
 root.geometry("860x720")
 root.resizable(False, False)
 
@@ -169,10 +186,10 @@ except:
 top_frame = ttk.Frame(root, padding=15)
 top_frame.pack(fill=tk.X)
 
-ttk.Label(top_frame, text="📁 Select Folder:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+ttk.Label(top_frame, text="📄 Select CSV Files or Folder:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
 folder_entry = ttk.Entry(top_frame, width=60)
 folder_entry.grid(row=0, column=1, padx=5)
-ttk.Button(top_frame, text="Browse", command=browse_folder).grid(row=0, column=2, padx=3)
+ttk.Button(top_frame, text="Browse", command=browse_files_or_folder).grid(row=0, column=2, padx=3)
 
 ttk.Label(top_frame, text="🔌 Select Connector:", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, padx=5, pady=10, sticky="w")
 connector_var = tk.StringVar()
