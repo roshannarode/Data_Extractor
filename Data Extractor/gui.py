@@ -12,15 +12,16 @@ class DataExtractorGUI:
     def __init__(self):
         self.summary_df = None  # Store result DataFrame for saving
         self.setup_main_window()
+        self.setup_menu_bar()
         self.setup_widgets()
 
     def setup_main_window(self):
         """Initialize the main window and styling."""
         self.root = tk.Tk()
-        self.root.title("Data Extractor")
-        self.root.geometry("1400x900")
+        self.root.title("CSV Summary App")
+        self.root.geometry("800x600")
         self.root.resizable(True, True)
-        self.root.minsize(1200, 800)  # Set minimum size
+        self.root.minsize(600, 400)
 
         # Set window icon
         try:
@@ -29,75 +30,82 @@ class DataExtractorGUI:
         except:
             pass  # Continue without icon if there's any issue
 
-        # Set up styling
+        # Configure style
         self.style = ttk.Style(self.root)
         try:
-            self.style.theme_use("clam")
+            self.style.theme_use("vista")  # Windows-like theme
         except:
-            self.style.theme_use("default")
+            try:
+                self.style.theme_use("clam")
+            except:
+                self.style.theme_use("default")
+
+    def setup_menu_bar(self):
+        """Create the menu bar."""
+        self.menubar = tk.Menu(self.root)
+        self.root.config(menu=self.menubar)
+
+        # File menu
+        self.file_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="File", menu=self.file_menu)
+        self.file_menu.add_command(label="Open Folder...", command=self.browse_files_or_folder)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.root.quit)
+
+        # Help menu
+        self.help_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Help", menu=self.help_menu)
+        self.help_menu.add_command(label="About", command=self.show_about)
 
     def setup_widgets(self):
         """Create and configure all GUI widgets."""
-        self.setup_top_frame()
-        self.setup_run_button()
-        self.setup_console()
-        self.setup_bottom_frame()
-        self.setup_status_label()
+        # Main container with padding
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-    def setup_top_frame(self):
-        """Create the top frame with file selection and connector options."""
-        self.top_frame = ttk.Frame(self.root, padding=20)
-        self.top_frame.pack(fill=tk.X, padx=10, pady=10)
+        # Select Folder section
+        folder_frame = ttk.Frame(main_frame)
+        folder_frame.pack(fill=tk.X, pady=(5, 10))
 
-        # File selection
-        ttk.Label(self.top_frame, text="📄 Select CSV Files or Folder:", 
-                 font=("Segoe UI", 10, "bold")).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(folder_frame, text="Select Folder:").pack(side=tk.LEFT, padx=(0, 10))
         
-        self.folder_entry = ttk.Entry(self.top_frame, width=80)
-        self.folder_entry.grid(row=0, column=1, padx=5)
+        self.folder_entry = ttk.Entry(folder_frame)
+        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         
-        ttk.Button(self.top_frame, text="Browse", 
-                  command=self.browse_files_or_folder).grid(row=0, column=2, padx=3)
+        self.browse_button = ttk.Button(folder_frame, text="Browse", command=self.browse_files_or_folder)
+        self.browse_button.pack(side=tk.RIGHT)
 
-        # Connector selection
-        ttk.Label(self.top_frame, text="🔌 Select Connector:", 
-                 font=("Segoe UI", 10, "bold")).grid(row=1, column=0, padx=5, pady=10, sticky="w")
+        # Connector section
+        connector_frame = ttk.Frame(main_frame)
+        connector_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(connector_frame, text="Connector:").pack(side=tk.LEFT, padx=(0, 10))
         
         self.connector_var = tk.StringVar()
-        self.connector_dropdown = ttk.Combobox(self.top_frame, textvariable=self.connector_var, 
-                                              state="readonly", width=77)
+        self.connector_dropdown = ttk.Combobox(connector_frame, textvariable=self.connector_var, 
+                                              state="readonly", width=20)
         self.connector_dropdown['values'] = ("Tekla", "Rhino")
         self.connector_dropdown.current(0)
-        self.connector_dropdown.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self.connector_dropdown.pack(side=tk.LEFT)
 
-    def setup_run_button(self):
-        """Create the main run button."""
-        ttk.Button(self.root, text="▶ Run Summary", 
-                  command=self.run_processing).pack(pady=10)
+        # Run Summary button
+        self.run_button = ttk.Button(main_frame, text="▶ Run Summary", command=self.run_processing)
+        self.run_button.pack(fill=tk.X, pady=(0, 10))
 
-    def setup_console(self):
-        """Create the console output area."""
-        self.output_console = scrolledtext.ScrolledText(self.root, width=140, height=35, 
-                                                       font=("Consolas", 11), wrap=tk.NONE)
-        self.output_console.pack(padx=15, pady=10, fill=tk.BOTH, expand=True)
+        # Output console
+        self.output_console = scrolledtext.ScrolledText(main_frame, font=("Consolas", 10), 
+                                                       wrap=tk.WORD, state=tk.DISABLED)
+        self.output_console.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-    def setup_bottom_frame(self):
-        """Create the bottom frame with save button."""
-        self.bottom_frame = ttk.Frame(self.root, padding=10)
-        self.bottom_frame.pack()
-
-        self.save_button = ttk.Button(self.bottom_frame, text="💾 Save CSV Now", 
+        # Save CSV button
+        self.save_button = ttk.Button(main_frame, text="💾 Save CSV", 
                                      command=self.save_summary_csv, state="disabled")
-        self.save_button.grid(row=0, column=0, padx=5)
+        self.save_button.pack(fill=tk.X)
 
-    def setup_status_label(self):
-        """Create the status label."""
-        self.status_label = ttk.Label(self.root, text="", font=("Segoe UI", 9, "italic"), 
-                                     foreground="green")
-        self.status_label.pack(pady=5)
+    def show_about(self):
+        """Show about dialog."""
+        messagebox.showinfo("About", "CSV Summary App\nVersion 2.0\n\nData Extractor Application\nAuthor: Roshan Narode")
 
-    # === Event Handlers ===
-    
     def browse_files_or_folder(self):
         """Handle file/folder browsing."""
         # Try to open files first
@@ -111,6 +119,20 @@ class DataExtractorGUI:
             if folder_selected:
                 self.folder_entry.delete(0, tk.END)
                 self.folder_entry.insert(0, folder_selected)
+
+    def write_to_console(self, message):
+        """Write message to console output."""
+        self.output_console.config(state=tk.NORMAL)
+        self.output_console.insert(tk.END, message)
+        self.output_console.see(tk.END)
+        self.output_console.config(state=tk.DISABLED)
+        self.output_console.update()
+
+    def clear_console(self):
+        """Clear console output."""
+        self.output_console.config(state=tk.NORMAL)
+        self.output_console.delete(1.0, tk.END)
+        self.output_console.config(state=tk.DISABLED)
 
     def run_processing(self):
         """Handle the main processing run."""
@@ -126,16 +148,14 @@ class DataExtractorGUI:
             messagebox.showerror("Error", "Please select valid CSV files or a folder containing CSV files!")
             return
 
-        self.output_console.delete(1.0, tk.END)
+        self.clear_console()
 
-        # Create callback functions for output and status updates
+        # Create callback functions for output
         def output_callback(message):
-            self.output_console.insert(tk.END, message)
-            self.output_console.update()
+            self.write_to_console(message)
 
         def status_callback(message):
-            self.status_label.config(text=message)
-            self.status_label.update()
+            self.write_to_console(f"Status: {message}\n")
 
         # Process based on selected connector
         if selected_connector == "Tekla":
@@ -163,9 +183,7 @@ class DataExtractorGUI:
         output_csv_path = save_summary_to_csv(self.summary_df, file_paths)
         
         if output_csv_path:
-            self.output_console.insert(tk.END, f"\n💾 CSV successfully saved to: {output_csv_path}\n")
-            self.output_console.update()
-            self.status_label.config(text="✅ CSV saved")
+            self.write_to_console(f"\n💾 CSV successfully saved to: {output_csv_path}\n")
         else:
             messagebox.showerror("Error", "Failed to save CSV file!")
 
