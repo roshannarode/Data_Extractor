@@ -18,7 +18,7 @@ class DataExtractorGUI:
     def setup_main_window(self):
         """Initialize the main window and styling."""
         self.root = tk.Tk()
-        self.root.title("CSV Summary App")
+        self.root.title("Data Extractor")
         self.root.geometry("800x600")
         self.root.resizable(True, True)
         self.root.minsize(600, 400)

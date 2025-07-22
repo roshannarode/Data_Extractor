@@ -3,12 +3,19 @@ import os
 import re
 
 # === Tekla-Specific Operation Mapping ===
-tekla_operation_name_map = {
+# For CREATE data (TotalTimeToCreateExchange)
+tekla_create_operation_map = {
     "ExportIFCTeklaAPI": "IFC",
     "CreateMeshGeometry": "Mesh",
     "CreateExchangeElementForPrimitive": "Primitives"
 }
-tekla_target_operations = list(tekla_operation_name_map.keys())
+
+# For READ data (TotalExchangeReadTime)
+tekla_read_operation_map = {
+    "LoadBrepItemInTekla": "IFC",          # LoadBrepItemInTekla: LoadBrepItemInTekla = IFC
+    "LoadMeshInTekla": "Mesh",             # LoadMeshInTekla: LoadMeshItem = Mesh
+    "LoadPrimitivesInTekla": "Primitives"  # LoadPrimitivesInTekla:Prep = Primitives
+}
 tekla_total_time_operation = "TotalTimeToCreateExchange"
 tekla_read_time_operation = "TotalExchangeReadTime"
 
@@ -20,9 +27,9 @@ def extract_model_name(file_name):
         return match.group(1)
     return file_name
 
-def match_operation(op_name):
-    """Match operation name to target operations."""
-    for internal in tekla_target_operations:
+def match_operation(op_name, operation_map):
+    """Match operation name to target operations using the specified mapping."""
+    for internal in operation_map.keys():
         if internal in op_name:
             return internal
     return None
@@ -89,6 +96,16 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     show_create_data = has_any_create_data
     show_read_data = has_any_read_data and not has_any_create_data
 
+    # Select the appropriate operation mapping
+    if show_create_data:
+        operation_map = tekla_create_operation_map
+        log_output(f"📊 Using CREATE operation mapping: {list(operation_map.keys())}\n")
+    elif show_read_data:
+        operation_map = tekla_read_operation_map
+        log_output(f"📊 Using READ operation mapping: {list(operation_map.keys())}\n")
+    else:
+        operation_map = tekla_create_operation_map  # Default fallback
+
     log_output(f"📊 Data availability analysis:\n")
     log_output(f"   - Create data found: {'Yes' if has_any_create_data else 'No'}\n")
     log_output(f"   - Read data found: {'Yes' if has_any_read_data else 'No'}\n")
@@ -97,11 +114,9 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     # Second pass: process the data
     for csv_file in csv_files:
         try:
-            log_output(f"📄 Processing: {os.path.basename(csv_file)}\n")
-
             df = pd.read_csv(csv_file)
             model_name = extract_model_name(os.path.basename(csv_file))
-            df['Matched Operation'] = df['Operation Name'].apply(match_operation)
+            df['Matched Operation'] = df['Operation Name'].apply(lambda op_name: match_operation(op_name, operation_map))
             matched_df = df[df['Matched Operation'].notnull()]
 
             summary = {
@@ -115,7 +130,7 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
             if not matched_df.empty:
                 op_summary = matched_df.groupby('Matched Operation')['#Events'].sum().to_dict()
                 for op_key, count in op_summary.items():
-                    display_name = tekla_operation_name_map.get(op_key)
+                    display_name = operation_map.get(op_key)
                     if display_name:
                         summary[display_name] = count
 
@@ -224,19 +239,6 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     
     # Display the formatted table
     log_output(f"{formatted_df.to_string(index=False, max_colwidth=20, justify='center')}\n\n")
-    
-    # Log summary statistics
-    if show_create_data:
-        avg_create_time = summary_df['create_data_minutes'].mean()
-        log_output(f"📈 Average Create Time: {avg_create_time:.2f} minutes\n")
-    elif show_read_data:
-        avg_read_time = summary_df['read_data_minutes'].mean()
-        log_output(f"📈 Average Read Time: {avg_read_time:.2f} minutes\n")
-    
-    avg_elements = summary_df['total_elements'].mean()
-    avg_performance = summary_df['element_per_min'].mean()
-    log_output(f"📈 Average Elements: {avg_elements:.0f}\n")
-    log_output(f"📈 Average Performance: {avg_performance:.2f} elements/min\n\n")
     
     update_status("✅ Processing complete. Click 'Save CSV' to export.")
 
