@@ -1,12 +1,23 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
+import sys
 from data_processor import (
     process_tekla_csv_files,
     process_rhino_placeholder,
     resolve_file_paths,
     save_summary_to_csv
 )
+
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 class DataExtractorGUI:
     def __init__(self):
@@ -18,16 +29,21 @@ class DataExtractorGUI:
     def setup_main_window(self):
         """Initialize the main window and styling."""
         self.root = tk.Tk()
-        self.root.title("Data Extractor")
+        self.root.title(" Data Extractor")
         self.root.geometry("800x600")
         self.root.resizable(True, True)
         self.root.minsize(600, 400)
 
         # Set window icon
         try:
-            if os.path.exists("icon.ico"):
-                self.root.iconbitmap("icon.ico")
-        except:
+            icon_path = get_resource_path("icon.ico")
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+                print(f"✅ Icon loaded: {icon_path}")
+            else:
+                print("⚠️ Icon file not found: icon.ico")
+        except Exception as e:
+            print(f"⚠️ Could not load icon: {e}")
             pass  # Continue without icon if there's any issue
 
         # Configure style
@@ -104,7 +120,38 @@ class DataExtractorGUI:
 
     def show_about(self):
         """Show about dialog."""
-        messagebox.showinfo("About", "CSV Summary App\nVersion 2.0\n\nData Extractor Application\nAuthor: Roshan Narode")
+        about_text = """Data Extractor Version 0.0.3
+
+Data Extractor Application for processing 
+CSV files from Tekla and Rhino connectors
+
+Author: Roshan Narode
+"""
+        
+        # Create custom about dialog with icon
+        about_window = tk.Toplevel(self.root)
+        about_window.title("About")
+        about_window.geometry("400x300")
+        about_window.resizable(False, False)
+        
+        # Set icon for about dialog
+        try:
+            icon_path = get_resource_path("icon.ico")
+            if os.path.exists(icon_path):
+                about_window.iconbitmap(icon_path)
+        except:
+            pass
+        
+        # Center the about window
+        about_window.transient(self.root)
+        about_window.grab_set()
+        
+        # Add content
+        ttk.Label(about_window, text=about_text, justify="center", 
+                 font=("Segoe UI", 10)).pack(pady=30)
+        
+        ttk.Button(about_window, text="OK", 
+                  command=about_window.destroy).pack(pady=10)
 
     def browse_files_or_folder(self):
         """Handle file/folder browsing."""

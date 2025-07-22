@@ -96,46 +96,63 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     show_create_data = has_any_create_data
     show_read_data = has_any_read_data and not has_any_create_data
 
-    # Select the appropriate operation mapping
-    if show_create_data:
-        operation_map = tekla_create_operation_map
-        log_output(f"📊 Using CREATE operation mapping: {list(operation_map.keys())}\n")
-    elif show_read_data:
-        operation_map = tekla_read_operation_map
-        log_output(f"📊 Using READ operation mapping: {list(operation_map.keys())}\n")
-    else:
-        operation_map = tekla_create_operation_map  # Default fallback
-
     log_output(f"📊 Data availability analysis:\n")
     log_output(f"   - Create data found: {'Yes' if has_any_create_data else 'No'}\n")
     log_output(f"   - Read data found: {'Yes' if has_any_read_data else 'No'}\n")
-    log_output(f"   - Will display: {'Create Data' if show_create_data else 'Read Data' if show_read_data else 'No timing data'}\n\n")
+    log_output(f"   - Will display: {'Create Data' if show_create_data else 'Read Data' if show_read_data else 'No timing data'}\n")
+    
+    if show_create_data:
+        log_output(f"📊 Using CREATE operation mapping: {list(tekla_create_operation_map.keys())}\n\n")
+    elif show_read_data:
+        log_output(f"📊 Using READ operation mapping: {list(tekla_read_operation_map.keys())}\n\n")
+    else:
+        log_output(f"📊 No timing data available\n\n")
 
     # Second pass: process the data
     for csv_file in csv_files:
         try:
             df = pd.read_csv(csv_file)
             model_name = extract_model_name(os.path.basename(csv_file))
-            df['Matched Operation'] = df['Operation Name'].apply(lambda op_name: match_operation(op_name, operation_map))
-            matched_df = df[df['Matched Operation'].notnull()]
 
             summary = {
                 "Data/Model": model_name, 
                 "Mesh": 0, 
                 "IFC": 0, 
-                "Primitives": 0, 
-                "total_elements": 0
+                "Primitives": 0
             }
 
-            if not matched_df.empty:
-                op_summary = matched_df.groupby('Matched Operation')['#Events'].sum().to_dict()
-                for op_key, count in op_summary.items():
-                    display_name = operation_map.get(op_key)
-                    if display_name:
-                        summary[display_name] = count
+            # Determine which operation mapping to use and process elements
+            total_elements = 0
+            if show_create_data:
+                # Use CREATE operation mapping
+                df['Matched_Operation'] = df['Operation Name'].apply(lambda op_name: match_operation(op_name, tekla_create_operation_map))
+                matched_df = df[df['Matched_Operation'].notnull()]
+                
+                if not matched_df.empty:
+                    op_summary = matched_df.groupby('Matched_Operation')['#Events'].sum().to_dict()
+                    for op_key, count in op_summary.items():
+                        display_name = tekla_create_operation_map.get(op_key)
+                        if display_name in summary:
+                            summary[display_name] = count
+                
+                total_elements = summary["Mesh"] + summary["IFC"] + summary["Primitives"]
 
-            # Calculate total elements
-            summary["total_elements"] = summary["Mesh"] + summary["IFC"] + summary["Primitives"]
+            elif show_read_data:
+                # Use READ operation mapping
+                df['Matched_Operation'] = df['Operation Name'].apply(lambda op_name: match_operation(op_name, tekla_read_operation_map))
+                matched_df = df[df['Matched_Operation'].notnull()]
+                
+                if not matched_df.empty:
+                    op_summary = matched_df.groupby('Matched_Operation')['#Events'].sum().to_dict()
+                    for op_key, count in op_summary.items():
+                        display_name = tekla_read_operation_map.get(op_key)
+                        if display_name in summary:
+                            summary[display_name] = count
+                
+                total_elements = summary["Mesh"] + summary["IFC"] + summary["Primitives"]
+
+            # Add total elements
+            summary["total_elements"] = total_elements
 
             # Handle timing data based on what should be displayed
             timing_ms = 0
