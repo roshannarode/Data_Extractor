@@ -4,7 +4,7 @@ import os
 import sys
 from data_processor import (
     process_tekla_csv_files,
-    process_rhino_placeholder,
+    process_rhino_files,
     resolve_file_paths,
     save_summary_to_csv
 )
@@ -30,6 +30,7 @@ class DataExtractorGUI:
         self.root.geometry("1000x600")
         self.root.resizable(True, True)
         self.root.minsize(1000, 600)
+
         
         # Set icon if available
         self._set_window_icon()
@@ -210,7 +211,7 @@ class DataExtractorGUI:
                 self.summary_df = process_tekla_csv_files(file_paths)
                 self._handle_processing_result()
             elif connector == "Rhino":
-                self.summary_df = process_rhino_placeholder()
+                self.summary_df = process_rhino_files(file_paths)
                 self._handle_processing_result()
             else:
                 messagebox.showwarning("Warning", "Please select a valid connector.")

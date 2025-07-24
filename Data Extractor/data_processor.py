@@ -3,7 +3,7 @@ import os
 
 # Import specialized processors
 from tekla_processor import process_tekla_csv_files
-from rhino_processor import process_rhino_placeholder, process_rhino_files
+from rhino_processor import process_rhino_files
 
 def resolve_file_paths(entry_value):
     """
@@ -57,7 +57,6 @@ def save_summary_to_csv(summary_df, file_paths):
 # Legacy compatibility - re-export main functions
 __all__ = [
     'process_tekla_csv_files',
-    'process_rhino_placeholder', 
     'process_rhino_files',
     'resolve_file_paths',
     'save_summary_to_csv'
