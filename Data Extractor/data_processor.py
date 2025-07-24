@@ -42,9 +42,7 @@ def extract_exchange_read_time_from_csv(csv_file_path):
             'read_time_ms': 0,
             'read_time_seconds': 0.0,
             'create_time_ms': 0,
-            'create_time_seconds': 0.0,
             'load_time_ms': 0,
-            'load_time_seconds': 0.0,
             'found': False
         }
         
@@ -63,8 +61,7 @@ def extract_exchange_read_time_from_csv(csv_file_path):
         if not create_time_row.empty:
             create_time_ms = create_time_row['Operation Time in Milliseconds'].iloc[0]
             result.update({
-                'create_time_ms': int(create_time_ms),
-                'create_time_seconds': round(create_time_ms / 1000, 2)
+                'create_time_ms': int(create_time_ms)
             })
             found_any = True
         
@@ -72,8 +69,7 @@ def extract_exchange_read_time_from_csv(csv_file_path):
         if not load_time_row.empty:
             load_time_ms = load_time_row['Operation Time in Milliseconds'].iloc[0]
             result.update({
-                'load_time_ms': int(load_time_ms),
-                'load_time_seconds': round(load_time_ms / 1000, 2)
+                'load_time_ms': int(load_time_ms)
             })
             found_any = True
         
@@ -122,11 +118,6 @@ def create_exchange_read_time_summary(file_paths_or_directory, save_to_csv=False
     Returns:
         pandas.DataFrame: Summary of exchange times
     """
-    read_time_data = extract_exchange_read_time_batch(file_paths_or_directory)
-    
-    if not read_time_data:
-        print("No time data found in the provided files.")
-        return None
     
     # Create DataFrame
     summary_df = pd.DataFrame(read_time_data)

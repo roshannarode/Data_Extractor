@@ -29,22 +29,31 @@ class DataExtractorGUI:
     def setup_main_window(self):
         """Initialize the main window and styling."""
         self.root = tk.Tk()
-        self.root.title(" Data Extractor")
-        self.root.geometry("800x600")
+        self.root.title("Data Extractor")
+        self.root.geometry("1200x800")
         self.root.resizable(True, True)
-        self.root.minsize(600, 400)
+        self.root.minsize(800, 600)
 
         # Set window icon
         try:
             icon_path = get_resource_path("icon.ico")
             if os.path.exists(icon_path):
                 self.root.iconbitmap(icon_path)
-                print(f"✅ Icon loaded: {icon_path}")
-            else:
-                print("⚠️ Icon file not found: icon.ico")
         except Exception as e:
-            print(f"⚠️ Could not load icon: {e}")
             pass  # Continue without icon if there's any issue
+        
+        # Force window to appear on top and in center
+        self.root.lift()
+        self.root.attributes('-topmost', True)
+        self.root.after_idle(lambda: self.root.attributes('-topmost', False))
+        
+        # Center the window on screen
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
         # Configure style
         self.style = ttk.Style(self.root)
@@ -84,23 +93,19 @@ class DataExtractorGUI:
         folder_frame.pack(fill=tk.X, pady=(5, 10))
 
         ttk.Label(folder_frame, text="Select Folder:").pack(side=tk.LEFT, padx=(0, 10))
-        
         self.folder_entry = ttk.Entry(folder_frame)
         self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        
         self.browse_button = ttk.Button(folder_frame, text="Browse", command=self.browse_files_or_folder)
         self.browse_button.pack(side=tk.RIGHT)
 
         # Connector section
         connector_frame = ttk.Frame(main_frame)
         connector_frame.pack(fill=tk.X, pady=(0, 10))
-
         ttk.Label(connector_frame, text="Connector:").pack(side=tk.LEFT, padx=(0, 10))
-        
         self.connector_var = tk.StringVar()
         self.connector_dropdown = ttk.Combobox(connector_frame, textvariable=self.connector_var, 
                                               state="readonly", width=20)
-        self.connector_dropdown['values'] = ("Tekla", "Rhino")
+        self.connector_dropdown['values'] = ("Tekla", "Rhino" , "DYNAMO")
         self.connector_dropdown.current(0)
         self.connector_dropdown.pack(side=tk.LEFT)
 
@@ -108,10 +113,10 @@ class DataExtractorGUI:
         self.run_button = ttk.Button(main_frame, text="▶ Run Summary", command=self.run_processing)
         self.run_button.pack(fill=tk.X, pady=(0, 10))
 
-        # Output console
-        self.output_console = scrolledtext.ScrolledText(main_frame, font=("Consolas", 10), 
-                                                       wrap=tk.WORD, state=tk.DISABLED)
-        self.output_console.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        # Table output area (Treeview)
+        self.table_frame = ttk.Frame(main_frame)
+        self.table_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.table = None  # Will be created after processing
 
         # Save CSV button
         self.save_button = ttk.Button(main_frame, text="💾 Save CSV", 
@@ -167,52 +172,83 @@ Author: Roshan Narode
                 self.folder_entry.delete(0, tk.END)
                 self.folder_entry.insert(0, folder_selected)
 
-    def write_to_console(self, message):
-        """Write message to console output."""
-        self.output_console.config(state=tk.NORMAL)
-        self.output_console.insert(tk.END, message)
-        self.output_console.see(tk.END)
-        self.output_console.config(state=tk.DISABLED)
-        self.output_console.update()
+    def clear_table(self):
+        if self.table is not None:
+            self.table.destroy()
+            self.table = None
 
-    def clear_console(self):
-        """Clear console output."""
-        self.output_console.config(state=tk.NORMAL)
-        self.output_console.delete(1.0, tk.END)
-        self.output_console.config(state=tk.DISABLED)
+    def display_table(self, df):
+        self.clear_table()
+        if df is None or df.empty:
+            return
+        columns = list(df.columns)
+        self.table = ttk.Treeview(self.table_frame, columns=columns, show="headings")
+        for col in columns:
+            self.table.heading(col, text=col)
+            self.table.column(col, anchor=tk.CENTER, width=120, stretch=True)
+        for _, row in df.iterrows():
+            self.table.insert("", tk.END, values=list(row))
+        self.table.pack(fill=tk.BOTH, expand=True)
+        # Resize columns to fit content
+        self.table.update_idletasks()
+        for col in columns:
+            max_width = max(
+                [self.table.bbox(item, column=columns.index(col))[2] if self.table.bbox(item, column=columns.index(col)) else 0 for item in self.table.get_children()] + [len(str(col)) * 10, 120]
+            )
+            self.table.column(col, width=max_width)
+        # Resize the table frame to fit the table
+        self.table_frame.update_idletasks()
 
     def run_processing(self):
         """Handle the main processing run."""
-        # Disable save button and clear console
+        # Disable save button and clear table
         self.save_button.config(state="disabled")
         self.summary_df = None
+        self.clear_table()
         
+        # Get input values
         entry_value = self.folder_entry.get().strip()
         selected_connector = self.connector_var.get()
-        file_paths = resolve_file_paths(entry_value)
-
-        if not file_paths:
-            messagebox.showerror("Error", "Please select valid CSV files or a folder containing CSV files!")
+        
+        # Check if folder/file path is provided
+        if not entry_value:
+            messagebox.showerror("Error", "Please select a folder or CSV files first using the Browse button!")
             return
-
-        self.clear_console()
-
-        # Create callback functions for output
-        def output_callback(message):
-            self.write_to_console(message)
-
-        def status_callback(message):
-            self.write_to_console(f"Status: {message}\n")
-
-        # Process based on selected connector
-        if selected_connector == "Tekla":
-            self.summary_df = process_tekla_csv_files(file_paths, output_callback, status_callback)
-            if self.summary_df is not None:
-                self.save_button.config(state="normal")
-        elif selected_connector == "Rhino":
-            self.summary_df = process_rhino_placeholder(output_callback, status_callback)
-        else:
-            messagebox.showwarning("Warning", "Please select a valid connector.")
+        
+        # Resolve file paths
+        file_paths = resolve_file_paths(entry_value)
+        
+        if not file_paths:
+            messagebox.showerror("Error", f"No CSV files found in the selected location: {entry_value}")
+            return
+        
+        try:
+            # Only process and display the table, no other output
+            if selected_connector == "Tekla":
+                self.summary_df = process_tekla_csv_files(file_paths)
+                
+                if self.summary_df is not None and not self.summary_df.empty:
+                    self.save_button.config(state="normal")
+                    self.display_table(self.summary_df)
+                    # Processing complete silently - no popup needed
+                else:
+                    messagebox.showwarning("No Data", "No valid data found in the CSV files. Please check that your CSV files contain the expected columns:\n- Operation Name\n- #Events\n- Operation Time in Milliseconds")
+                    
+            elif selected_connector == "Rhino":
+                self.summary_df = process_rhino_placeholder()
+                
+                if self.summary_df is not None and not self.summary_df.empty:
+                    self.save_button.config(state="normal")
+                    self.display_table(self.summary_df)
+                    # Processing complete silently - no popup needed
+                else:
+                    messagebox.showinfo("Info", "Rhino processing is not yet implemented. This is a placeholder.")
+                    
+            else:
+                messagebox.showwarning("Warning", "Please select a valid connector (Tekla or Rhino).")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during processing:\n{str(e)}")
 
     def save_summary_csv(self):
         """Handle CSV saving."""

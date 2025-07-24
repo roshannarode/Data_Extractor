@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Data Extractor Application
-Version 2.0
+Version 0.0.2
 
 Main entry point for the Data Extractor application.
 This application processes CSV files from different connectors (Tekla, Rhino)

@@ -156,6 +156,7 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
 
             # Handle timing data based on what should be displayed
             timing_ms = 0
+            time_minutes = 0
             
             total_time_row = df[df['Operation Name'] == tekla_total_time_operation]
             read_time_row = df[df['Operation Name'] == tekla_read_time_operation]
@@ -163,24 +164,22 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
             if show_create_data and not total_time_row.empty:
                 # Show create data
                 timing_ms = total_time_row["Operation Time in Milliseconds"].sum()
-                summary["create_data_ms"] = int(timing_ms)
-                summary["create_data_minutes"] = round(timing_ms / 60000, 2)
-                summary["create_data_seconds"] = round(timing_ms / 1000, 2)
+                time_minutes = round(timing_ms / 60000, 2)
+                summary["milliseconds"] = int(timing_ms)
+                summary["minutes"] = time_minutes
                 
             elif show_read_data and not read_time_row.empty:
                 # Show read data (only if no create data available)
                 timing_ms = read_time_row["Operation Time in Milliseconds"].sum()
-                summary["read_data_ms"] = int(timing_ms)
-                summary["read_data_minutes"] = round(timing_ms / 60000, 2)
-                summary["read_data_seconds"] = round(timing_ms / 1000, 2)
-
-            # Add general timing columns for backward compatibility
-            summary["milliseconds"] = int(timing_ms)
-            summary["minutes"] = round(timing_ms / 60000, 2)
-            summary["seconds"] = round(timing_ms / 1000, 2)
+                time_minutes = round(timing_ms / 60000, 2)
+                summary["milliseconds"] = int(timing_ms)
+                summary["minutes"] = time_minutes
+            else:
+                # No timing data found
+                summary["milliseconds"] = 0
+                summary["minutes"] = 0
             
             # Calculate elements per minute
-            time_minutes = summary["minutes"]
             summary["element_per_min"] = calculate_elements_per_min(summary["total_elements"], time_minutes)
 
             model_data.append(summary)
@@ -196,14 +195,7 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     summary_df = pd.DataFrame(model_data)
     
     # Fill NaN values and set appropriate data types
-    numeric_columns = ['Mesh', 'IFC', 'Primitives', 'total_elements', 'milliseconds', 'element_per_min']
-    
-    if show_create_data:
-        numeric_columns.extend(['create_data_ms', 'create_data_minutes', 'create_data_seconds'])
-    elif show_read_data:
-        numeric_columns.extend(['read_data_ms', 'read_data_minutes', 'read_data_seconds'])
-    
-    numeric_columns.extend(['minutes', 'seconds'])
+    numeric_columns = ['Mesh', 'IFC', 'Primitives', 'total_elements', 'milliseconds', 'minutes', 'element_per_min']
     
     for col in numeric_columns:
         if col in summary_df.columns:
@@ -211,10 +203,6 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
 
     # Set integer types for specific columns
     int_columns = ['Mesh', 'IFC', 'Primitives', 'total_elements', 'milliseconds']
-    if show_create_data:
-        int_columns.append('create_data_ms')
-    elif show_read_data:
-        int_columns.append('read_data_ms')
     
     for col in int_columns:
         if col in summary_df.columns:
@@ -228,27 +216,19 @@ def process_tekla_csv_files(file_paths, output_callback=None, status_callback=No
     formatted_df = summary_df.copy()
     
     # Build column order for display
-    display_columns = ['Data/Model', 'Mesh', 'IFC', 'Primitives', 'total_elements']
+    display_columns = ['Data/Model', 'Mesh', 'IFC', 'Primitives', 'total_elements', 'milliseconds', 'minutes', 'element_per_min']
     
     if show_create_data:
-        display_columns.extend(['create_data_ms', 'create_data_seconds', 'create_data_minutes'])
         log_output("📊 Displaying CREATE DATA (create time takes precedence)\n\n")
     elif show_read_data:
-        display_columns.extend(['read_data_ms', 'read_data_seconds', 'read_data_minutes'])
         log_output("📊 Displaying READ DATA (no create data available)\n\n")
-    
-    display_columns.extend(['element_per_min'])
     
     # Only include columns that exist in the DataFrame
     available_columns = [col for col in display_columns if col in formatted_df.columns]
     formatted_df = formatted_df[available_columns]
     
     # Format numbers with commas for better readability
-    number_columns = ['Mesh', 'IFC', 'Primitives', 'total_elements']
-    if show_create_data:
-        number_columns.append('create_data_ms')
-    elif show_read_data:
-        number_columns.append('read_data_ms')
+    number_columns = ['Mesh', 'IFC', 'Primitives', 'total_elements', 'milliseconds']
     
     for col in number_columns:
         if col in formatted_df.columns:
