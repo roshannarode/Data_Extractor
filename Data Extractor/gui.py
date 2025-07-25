@@ -5,6 +5,7 @@ import sys
 from data_processor import (
     process_tekla_csv_files,
     process_rhino_files,
+    process_navisworks_files,
     resolve_file_paths,
     save_summary_to_csv
 )
@@ -138,7 +139,7 @@ class DataExtractorGUI:
         self.connector_dropdown = ttk.Combobox(connector_frame, 
                                              textvariable=self.connector_var, 
                                              state="readonly", width=20)
-        self.connector_dropdown['values'] = ("Tekla", "Rhino", "DYNAMO")
+        self.connector_dropdown['values'] = ("Tekla", "Rhino", "Navisworks")
         self.connector_dropdown.current(0)
         self.connector_dropdown.pack(side=tk.LEFT)
 
@@ -213,6 +214,9 @@ class DataExtractorGUI:
             elif connector == "Rhino":
                 self.summary_df = process_rhino_files(file_paths)
                 self._handle_processing_result()
+            elif connector == "Navisworks":
+                self.summary_df = process_navisworks_files(file_paths)
+                self._handle_processing_result()
             else:
                 messagebox.showwarning("Warning", "Please select a valid connector.")
         except Exception as e:
@@ -250,7 +254,7 @@ class DataExtractorGUI:
         about_text = """Data Extractor Version 0.0.3
 
 CSV file processing application for 
-Tekla and Rhino connectors
+Tekla, Rhino, and Navisworks connectors
 
 Author: Roshan Narode"""
         
