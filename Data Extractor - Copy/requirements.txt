@@ -1,4 +1,0 @@
-pandas>=1.3.0
-
-# Development dependencies (for building executable)
-pyinstaller>=5.0 

@@ -1,13 +1,17 @@
 import pandas as pd
 import os
 
-# Application version
-APP_VERSION = "0.0.6"
+# Import version from central location
+from version import APP_VERSION
 
 # Import specialized processors
 from tekla_processor import process_tekla_csv_files
 from rhino_processor import process_rhino_files
-from navisworks_processor import process_navisworks_files
+from navisworks_processor import (
+    process_navisworks_files, 
+    extract_read_data_with_exchange_time, 
+    extract_read_data_from_multiple_files
+)
 
 def resolve_file_paths(entry_value):
     """
@@ -104,6 +108,8 @@ __all__ = [
     'process_tekla_csv_files',
     'process_rhino_files',
     'process_navisworks_files',
+    'extract_read_data_with_exchange_time',
+    'extract_read_data_from_multiple_files',
     'resolve_file_paths',
     'save_summary_to_csv',
     'save_navisworks_separate_csvs',

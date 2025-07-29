@@ -24,9 +24,9 @@ import shutil
 from pathlib import Path
 import argparse
 
-# Import version from data_processor
+# Import version from central location
 try:
-    from data_processor import APP_VERSION
+    from version import APP_VERSION
 except ImportError:
     # Fallback if import fails
     APP_VERSION = "0.0.6"
@@ -186,6 +186,18 @@ def build_executable():
     if not Path("version_info.txt").exists():
         print("❌ version_info.txt not found!")
         return False
+    
+    # Auto-update version_info.txt to match central version
+    print("🔄 Updating version_info.txt...")
+    try:
+        result = subprocess.run([sys.executable, "update_version_info.py"], 
+                              capture_output=True, text=True, check=True)
+        print("✅ version_info.txt updated automatically")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Failed to update version_info.txt: {e}")
+        print("💡 You may need to run 'python update_version_info.py' manually")
+    except FileNotFoundError:
+        print("⚠️ update_version_info.py not found - version_info.txt may be outdated")
     
     # Find icon
     icon_path = find_icon()

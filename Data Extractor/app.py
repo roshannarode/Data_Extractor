@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Data Extractor Application
-Version 0.0.6
 
 Main entry point for the Data Extractor application.
 This application processes CSV files from different connectors (Tekla, Rhino, Navisworks)
@@ -14,7 +13,7 @@ Author: Roshan Narode
 """
 
 from gui import DataExtractorGUI
-from data_processor import APP_VERSION
+from version import APP_VERSION
 
 def main():
     """Main function to start the Data Extractor application."""
