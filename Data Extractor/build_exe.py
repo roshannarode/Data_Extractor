@@ -24,6 +24,14 @@ import shutil
 from pathlib import Path
 import argparse
 
+# Import version from central location
+try:
+    from version import APP_VERSION
+except ImportError:
+    # Fallback if import fails
+    APP_VERSION = "0.0.6"
+    print(f"⚠️ Could not import version, using fallback: {APP_VERSION}")
+
 def check_pyinstaller():
     """Check if PyInstaller is installed."""
     try:
@@ -168,7 +176,7 @@ def verify_signature(exe_path, signtool_path):
 
 def build_executable():
     """Build the executable using PyInstaller."""
-    print("🔨 Building Data Extractor executable...")
+    print(f"🔨 Building Data Extractor v{APP_VERSION} executable...")
     
     # Check for required files
     if not Path("app.py").exists():
@@ -179,6 +187,18 @@ def build_executable():
         print("❌ version_info.txt not found!")
         return False
     
+    # Auto-update version_info.txt to match central version
+    print("🔄 Updating version_info.txt...")
+    try:
+        result = subprocess.run([sys.executable, "update_version_info.py"], 
+                              capture_output=True, text=True, check=True)
+        print("✅ version_info.txt updated automatically")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Failed to update version_info.txt: {e}")
+        print("💡 You may need to run 'python update_version_info.py' manually")
+    except FileNotFoundError:
+        print("⚠️ update_version_info.py not found - version_info.txt may be outdated")
+    
     # Find icon
     icon_path = find_icon()
     
@@ -187,7 +207,7 @@ def build_executable():
         "pyinstaller",
         "--onefile",  # Create a single executable file
         "--windowed",  # Hide console window (for GUI apps)
-        "--name=DataExtractor",  # Name of the executable
+        f"--name=Data Extractor v{APP_VERSION}",  # Name of the executable with version
         "--version-file=version_info.txt",  # Version information
     ]
     
@@ -208,7 +228,7 @@ def build_executable():
         print("✅ Build completed successfully!")
         
         # Check if executable was created
-        exe_path = Path("dist") / "DataExtractor.exe"
+        exe_path = Path("dist") / f"Data Extractor v{APP_VERSION}.exe"
         if exe_path.exists():
             file_size = exe_path.stat().st_size / (1024 * 1024)  # Size in MB
             print(f"✅ Executable created: {exe_path}")
@@ -228,7 +248,7 @@ def cleanup_build_files():
     print("🧹 Cleaning up build files...")
     
     folders_to_remove = ["build", "__pycache__"]
-    files_to_remove = ["DataExtractor.spec"]
+    files_to_remove = [f"Data Extractor v{APP_VERSION}.spec"]
     
     for folder in folders_to_remove:
         if Path(folder).exists():
@@ -278,8 +298,8 @@ def main():
         show_signing_help()
         return 0
     
-    print("🚀 Data Extractor Build Process")
-    print("=" * 40)
+    print(f"🚀 Data Extractor v{APP_VERSION} Build Process")
+    print("=" * 50)
     
     # Check if PyInstaller is available
     if not check_pyinstaller():
