@@ -2,12 +2,15 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
 import sys
+import pandas as pd
 from data_processor import (
     process_tekla_csv_files,
     process_rhino_files,
     process_navisworks_files,
     resolve_file_paths,
-    save_summary_to_csv
+    save_summary_to_csv,
+    save_navisworks_separate_csvs,
+    APP_VERSION
 )
 
 def get_resource_path(relative_path):
@@ -21,13 +24,16 @@ def get_resource_path(relative_path):
 class DataExtractorGUI:
     def __init__(self):
         self.summary_df = None
+        self.export_df = None  # Store export data separately for Navisworks
+        self.read_df = None    # Store read data separately for Navisworks
+        self.is_navisworks_dual = False  # Track if we have dual Navisworks tables
         self.root = tk.Tk()
         self.setup_window()
         self.setup_interface()
 
     def setup_window(self):
         """Configure main window properties"""
-        self.root.title("Data Extractor")
+        self.root.title(f"Data Extractor v{APP_VERSION}")
         self.root.geometry("1000x600")
         self.root.resizable(True, True)
         self.root.minsize(1000, 600)
@@ -156,7 +162,7 @@ class DataExtractorGUI:
                 self.folder_entry.delete(0, tk.END)
                 self.folder_entry.insert(0, folder)
 
-    def display_table(self, df):
+    def display_table(self, df, title=None):
         """Display results in table format"""
         # Clear existing table
         if self.table:
@@ -164,6 +170,11 @@ class DataExtractorGUI:
             
         if df is None or df.empty:
             return
+
+        # Create new table with optional title
+        if title:
+            title_label = ttk.Label(self.table_frame, text=title, font=("Segoe UI", 12, "bold"))
+            title_label.pack(pady=(0, 5))
 
         # Create new table
         columns = list(df.columns)
@@ -183,11 +194,83 @@ class DataExtractorGUI:
             
         self.table.pack(fill=tk.BOTH, expand=True)
 
+    def display_dual_tables(self, export_df, read_df):
+        """Display create and read data in separate tables"""
+        # Clear existing table
+        if self.table:
+            self.table.destroy()
+            self.table = None
+            
+        # Clear any existing widgets in table_frame
+        for widget in self.table_frame.winfo_children():
+            widget.destroy()
+
+        # Create container for both tables
+        dual_container = ttk.Frame(self.table_frame)
+        dual_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Create table section
+        if export_df is not None and not export_df.empty:
+            export_frame = ttk.LabelFrame(dual_container, text="Create Data", padding=5)
+            export_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+            
+            export_columns = list(export_df.columns)
+            export_table = ttk.Treeview(export_frame, columns=export_columns, show="headings", height=8)
+            
+            # Configure create table columns
+            for col in export_columns:
+                export_table.heading(col, text=col)
+                if col == "Data/Model":
+                    export_table.column(col, anchor=tk.W, width=150, stretch=True)
+                else:
+                    export_table.column(col, anchor=tk.CENTER, width=100, stretch=True)
+            
+            # Add create data rows
+            for _, row in export_df.iterrows():
+                export_table.insert("", tk.END, values=list(row))
+                
+            export_table.pack(fill=tk.BOTH, expand=True)
+            
+            # Add scrollbars for create table
+            export_scrollbar_y = ttk.Scrollbar(export_frame, orient=tk.VERTICAL, command=export_table.yview)
+            export_table.configure(yscrollcommand=export_scrollbar_y.set)
+            export_scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+            
+        # Read table section  
+        if read_df is not None and not read_df.empty:
+            read_frame = ttk.LabelFrame(dual_container, text="Read Data", padding=5)
+            read_frame.pack(fill=tk.BOTH, expand=True)
+            
+            read_columns = list(read_df.columns)
+            read_table = ttk.Treeview(read_frame, columns=read_columns, show="headings", height=8)
+            
+            # Configure read table columns
+            for col in read_columns:
+                read_table.heading(col, text=col)
+                if col == "Data/Model":
+                    read_table.column(col, anchor=tk.W, width=150, stretch=True)
+                else:
+                    read_table.column(col, anchor=tk.CENTER, width=100, stretch=True)
+            
+            # Add read data rows
+            for _, row in read_df.iterrows():
+                read_table.insert("", tk.END, values=list(row))
+                
+            read_table.pack(fill=tk.BOTH, expand=True)
+            
+            # Add scrollbars for read table
+            read_scrollbar_y = ttk.Scrollbar(read_frame, orient=tk.VERTICAL, command=read_table.yview)
+            read_table.configure(yscrollcommand=read_scrollbar_y.set)
+            read_scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+
     def run_processing(self):
         """Execute data processing"""
         # Reset state
         self.save_button.config(state="disabled")
         self.summary_df = None
+        self.export_df = None
+        self.read_df = None
+        self.is_navisworks_dual = False
         if self.table:
             self.table.destroy()
             self.table = None
@@ -215,12 +298,71 @@ class DataExtractorGUI:
                 self.summary_df = process_rhino_files(file_paths)
                 self._handle_processing_result()
             elif connector == "Navisworks":
-                self.summary_df = process_navisworks_files(file_paths)
-                self._handle_processing_result()
+                # Navisworks returns tuple (export_df, read_df)
+                result = process_navisworks_files(file_paths)
+                self._handle_navisworks_result(result)
             else:
                 messagebox.showwarning("Warning", "Please select a valid connector.")
         except Exception as e:
             messagebox.showerror("Error", f"Processing failed:\n{str(e)}")
+
+    def _handle_navisworks_result(self, result):
+        """Handle Navisworks processing result (tuple of export and read DataFrames)"""
+        if result is None or (result[0] is None and result[1] is None):
+            messagebox.showwarning("No Data", 
+                                 "No valid data found. Check your CSV files contain:\n"
+                                 "- Operation Name\n- #Events\n- Operation Time in Milliseconds")
+            return
+            
+        export_df, read_df = result
+        
+        # Check what data is available
+        has_export_data = export_df is not None and not export_df.empty
+        has_read_data = read_df is not None and not read_df.empty
+        
+        # Automatically decide which table(s) to show based on available data
+        if has_export_data and has_read_data:
+            # Both tables have data - show both in separate tables
+            self.display_dual_tables(export_df, read_df)
+            self.export_df = export_df
+            self.read_df = read_df
+            self.is_navisworks_dual = True
+            
+            # For saving purposes, combine the data
+            export_copy = export_df.copy()
+            read_copy = read_df.copy()
+            export_copy['Data_Type'] = 'Export'
+            read_copy['Data_Type'] = 'Read'
+            self.summary_df = pd.concat([export_copy, read_copy], ignore_index=True)
+            
+            self.save_button.config(state="normal")
+            print(f"Navisworks: Displaying separate tables - Create: {len(export_df)} rows, Read: {len(read_df)} rows")
+            
+        elif has_export_data:
+            # Only create data available - show single create table
+            self.export_df = export_df
+            self.read_df = None
+            self.is_navisworks_dual = True  # Use separate save even for single table
+            self.summary_df = export_df
+            self.save_button.config(state="normal") 
+            self.display_table(export_df, "Create Data")
+            
+            print(f"Navisworks: Displaying create data - {len(export_df)} rows")
+            
+        elif has_read_data:
+            # Only read data available - show single read table
+            self.export_df = None
+            self.read_df = read_df
+            self.is_navisworks_dual = True  # Use separate save even for single table
+            self.summary_df = read_df
+            self.save_button.config(state="normal")
+            self.display_table(read_df, "Read Data")
+            
+            print(f"Navisworks: Displaying read data - {len(read_df)} rows")
+            
+        else:
+            # No data in either table
+            messagebox.showwarning("No Data", "No export or read data found in the processed files.")
 
     def _handle_processing_result(self):
         """Handle the result of data processing"""
@@ -243,15 +385,41 @@ class DataExtractorGUI:
             messagebox.showerror("Error", "Invalid file selection!")
             return
 
-        output_path = save_summary_to_csv(self.summary_df, file_paths)
-        if output_path:
-            messagebox.showinfo("Success", f"CSV saved to:\n{output_path}")
+        if self.is_navisworks_dual:
+            # Save Navisworks data to separate CSV files
+            export_path, read_path = save_navisworks_separate_csvs(self.export_df, self.read_df, file_paths)
+            
+            success_messages = []
+            error_messages = []
+            
+            if export_path:
+                success_messages.append(f"Create data: {export_path}")
+            else:
+                error_messages.append("Failed to save Create CSV!")
+                
+            if read_path:
+                success_messages.append(f"Read data: {read_path}")
+            else:
+                error_messages.append("Failed to save Read CSV!")
+            
+            if success_messages:
+                message = "Navisworks CSV files saved:\n" + "\n".join(success_messages)
+                messagebox.showinfo("Success", message)
+            
+            if error_messages:
+                error_message = "\n".join(error_messages)
+                messagebox.showerror("Error", error_message)
         else:
-            messagebox.showerror("Error", "Failed to save CSV file!")
+            # Standard single CSV save for other connectors
+            output_path = save_summary_to_csv(self.summary_df, file_paths)
+            if output_path:
+                messagebox.showinfo("Success", f"CSV saved to:\n{output_path}")
+            else:
+                messagebox.showerror("Error", "Failed to save CSV file!")
 
     def show_about(self):
         """Show application information"""
-        about_text = """Data Extractor Version 0.0.3
+        about_text = f"""Data Extractor Version {APP_VERSION}
 
 CSV file processing application for 
 Tekla, Rhino, and Navisworks connectors
@@ -259,7 +427,7 @@ Tekla, Rhino, and Navisworks connectors
 Author: Roshan Narode"""
         
         about_window = tk.Toplevel(self.root)
-        about_window.title("About")
+        about_window.title(f"About Data Extractor {APP_VERSION}")
         about_window.geometry("350x200")
         about_window.resizable(False, False)
         about_window.transient(self.root)

@@ -4,17 +4,17 @@ import re
 
 # Operation mappings for different data types in Rhino
 CREATE_OPERATIONS = {
+    "CreateBrepElement:CreateBrepGeometry": "Brep",
+    "CreateMeshElement:CreateMeshGeometry": "Mesh",
+    "CreatePrimitiveElement:CreatePrimitiveGeometry": "Primitive",
+    # Keep legacy operations for backward compatibility
     "CreateMeshGeometry": "Mesh",
-    "CreateBrepGeometry": "Brep", 
-    "CreateCurveGeometry": "Curves",
-    "CreatePointGeometry": "Points"
+    "CreateBrepGeometry": "Brep"
 }
 
 READ_OPERATIONS = {
     "LoadMeshInRhino": "Mesh",
-    "LoadBrepInRhino": "Brep",
-    "LoadCurveInRhino": "Curves", 
-    "LoadPointInRhino": "Points"
+    "LoadBrepInRhino": "Brep"
 }
 
 # Time operation names for Rhino
@@ -48,8 +48,7 @@ def process_single_file(csv_file):
             "Data/Model": model_name,
             "Mesh": 0,
             "Brep": 0,
-            "Curves": 0,
-            "Points": 0,
+            "Primitive": 0,
             "total_elements": 0,
             "milliseconds": 0,
             "minutes": 0,
@@ -78,7 +77,7 @@ def process_single_file(csv_file):
                 summary[display_name] += row['#Events']
         
         # Calculate total elements
-        summary["total_elements"] = summary["Mesh"] + summary["Brep"] + summary["Curves"] + summary["Points"]
+        summary["total_elements"] = summary["Mesh"] + summary["Brep"] + summary["Primitive"]
         
         # Process timing data
         time_rows = df[df['Operation Name'] == time_operation]
@@ -135,7 +134,7 @@ def process_rhino_files(file_paths, output_callback=None, status_callback=None):
     summary_df = pd.DataFrame(results)
     
     # Ensure proper data types
-    numeric_columns = ['Mesh', 'Brep', 'Curves', 'Points', 'total_elements', 'milliseconds']
+    numeric_columns = ['Mesh', 'Brep', 'Primitive', 'total_elements', 'milliseconds']
     for col in numeric_columns:
         if col in summary_df.columns:
             summary_df[col] = summary_df[col].fillna(0).astype(int)
