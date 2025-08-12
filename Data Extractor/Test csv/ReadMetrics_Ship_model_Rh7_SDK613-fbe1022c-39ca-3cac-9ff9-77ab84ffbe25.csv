@@ -1,0 +1,49 @@
+Operation Name,#Events,Operation Time in Milliseconds
+Read : GetLatestExchangeDataAsync:TotalExchangeReadTime,2,91286
+ConnectorExecutionTime,12,15672
+DXSDKExecutionTime,6,6197
+Read : ProcessReadExchangesAsync(),1,1614
+Read : CreateExchangeIdentifier(),1,0
+Read : GetExchangeRevisionsAsync(),1,87
+Read : GetOldCurrentRevision(),1,0
+GetExchangeFromCache,1,1429
+GetExchangeRevisions,1,96
+Read : ValidateReadConditions(),1,0
+Read : ProcessFilesStructure(),1,1177
+Read : Create(),1,1
+DataModelParsingTime,1,1
+Read : GetElements(),1,28
+Read : GetFlattenedListOfElements(),0,142415
+Read : GetAllGeometryAssetsByType(),1,1
+Read : FilterElementsByGeometryType(),1,27
+Read : GetElementGeometriesAndBrepBinaryData(),2,247
+Read : GetElementGeometriesByElements() :CurveSet: ,1,5202
+Read : DownloadBrepData(),1,1463
+Read : GetElementGeometriesByElementsAsync() :CurveSet: ,1,5201
+GetGeometry,1,5201
+GetElementGeometriesByElementsAsync,1,5201
+GetElementGeometriesByGeometryAssets,1,5198
+CreatePrimitiveGeometryForGeomAssetWithRenderStyle,953,5093
+Read : DownloadBinary(),1,1215
+DownloadAndCacheBinaryForBinaryAsset,1,0
+GetAssetInfoForGeometryAsset,1,0
+Read : GetMeshPrimitiveData(),1,111
+Read : ReadPrimitiveCount Counter,953,0
+Read : GetElementsByGeometryBrep(),1,5
+Read : ProcessGroups(),1,53960
+Read : GetGroupsInCaseOfNewExchangeLoad(),1,53960
+Read : GetGroupNameList(),1,22
+Read : AddGroupNameInList(),3461,15
+Read : GetGroupNameWithParametricData(),3461,13
+Read : AddGroupNameIfNotExists(),3461,0
+Read : AddParameterToElementParam(),3461,10
+Read : GetSelectedGroups(),1,53937
+Read : GetParametersListAndGenerateExchangeData(),1,12844
+Read : ReadBrepCount Counter,5012,2
+Read : Full reload - WiteExchangeDataInFile(),1,1182
+Read : GetLatestExchangeDataAsync() : LoadExchangeIntoNavisworks(),0,70250
+NavisworkApiExecutionTime,3,69363
+Read : GetCurrentDataExchange(),1,876
+Read : GetExchangeAsync(),1,876
+Read : UpdateExchangeVersionOnUpdateAsync(),1,0
+Read : SetExchangeDataToDatabase(),1,7
